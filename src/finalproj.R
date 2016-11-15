@@ -29,15 +29,27 @@ str(test)
 
 
 ### EDA ###
-plot(train$SalePrice)
-hist(train$SalePrice)
-hist(log(train$SalePrice+1))
+dim(train)
 summary(train)
 str(train)
 
+plot(train$SalePrice)
+hist(train$SalePrice)
+hist(log(train$SalePrice+1))
+
+boxplot(split(train$SalePrice,cycle(prcp)),names=month.abb,col="lightblue")
+
+nrow(train)
+nrow(unique(train))
+
 anyNA(train)
 
-
+cat_var <- names(train)[which(sapply(train, is.character))]
+cat_car <- c(cat_var, 'BedroomAbvGr', 'HalfBath', ' KitchenAbvGr','BsmtFullBath', 'BsmtHalfBath', 'MSSubClass')
+numeric_var <- names(train)[which(sapply(train, is.numeric))]
+train[,(cat_var) := lapply(.SD, as.factor), .SDcols = cat_var]
+train_cat <- train[,.SD, .SDcols = cat_var]
+train_cont <- train[,.SD,.SDcols = numeric_var]
 
 
 ### Data Prep ###
