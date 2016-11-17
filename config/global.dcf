@@ -4,7 +4,7 @@ cache_loading: TRUE
 recursive_loading: FALSE
 munging: TRUE
 logging: FALSE
-load_libraries: FALSE
+load_libraries: TRUE
 libraries: reshape, plyr, dplyr, ggplot2, stringr, lubridate, data.table, caret, mice
 as_factors: TRUE
 data_tables: FALSE
