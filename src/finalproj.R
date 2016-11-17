@@ -42,16 +42,39 @@ sapply(train,function(x) length(unique(x)))
 # check features with near zero variance
 nearZeroVar(train,saveMetrics = TRUE)
 
-# separate categorical and numerical variables
-cat_col <- names(train)[which(sapply(train, is.factor))]
-cat_var <- c(cat_col, 'BedroomAbvGr', 'HalfBath', 'KitchenAbvGr','BsmtFullBath', 'BsmtHalfBath', 'MSSubClass')
+# change some int var to factors and separate categorical and numerical variables to individual data frames
+change_var <- c("OverallQual","OverallCond","FullBath","TotRmsAbvGrd","Fireplaces","GarageCars","MoSold")
+train[,(change_var):=lapply(.SD,as.factor),.SDcols=change_var]
+cat_var <- names(train)[which(sapply(train, is.factor))]
 num_var <- names(train)[which(sapply(train, is.numeric))]
 train[,(cat_var) := lapply(.SD, as.factor), .SDcols = cat_var]
 train_cat <- train[,.SD,.SDcols = cat_var]
-train_cont <- train[,.SD,.SDcols = num_var]
+train_num <- train[,.SD,.SDcols = num_var]
+
+# apply new factor levels for variables that have meaningful NA levels so we don't impute/delete them
+ok_na <- c("Alley", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "GarageType", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature")
+
+addNoAnswer <- function(x){
+    if(is.factor(x)) return(factor(x, levels=c(levels(x), "None")))
+    return(x)
+}
+
+train[,(ok_na):=lapply(.SD,addNoAnswer),.SDcols=ok_na]
+
+changeNA <- function (x) {
+    x[is.na(x)] <- "None"
+    return(x)
+}
+
+train[,(ok_na):=lapply(.SD,changeNA),.SDcols=ok_na]
+
+head(train$Alley)
+head(train$BsmtQual)
+class(train$Alley)
 
 
-# plots
+
+# initial plots
 plot(train$SalePrice)
 hist(train$SalePrice)
 qqnorm(train$SalePrice)
@@ -62,10 +85,6 @@ par(mfrow=c(1,2))
 boxplot(train$SalePrice,col="lightblue")
 boxplot(log(train$SalePrice+1),col="red")
 par(mfrow=c(1,1))
-
-# histogram of sale price by year and by month
-hist(train$SalePrice,"month")
-hist(train$SalePrice,"year")
 
 
 # remodeled homes
@@ -102,7 +121,7 @@ train %>% select(LandSlope, Neighborhood, SalePrice) %>% filter(LandSlope == c('
 
 train %>% select(Neighborhood, SalePrice) %>% ggplot(aes(factor(Neighborhood), SalePrice)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust =1)) + xlab('Neighborhoods')
 
-cor(train_cont)
+cor(train_num,use="complete.obs")
 
 
 train %>% select(OverallCond, YearBuilt) %>% ggplot(aes(factor(OverallCond),YearBuilt)) + geom_boxplot() + xlab('Overall Condition')
@@ -127,37 +146,6 @@ doPlots(data_corr, fun = plotCorr, ii = 1:6)
 
 ### Data Prep ###
 
-# change variables with meaningful NA to another factor name
-# Alley, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, GarageType, GarageFinish, GarageQual, GarageCond, PoolQC, Fence, MiscFeature
-okNA <- c("Alley", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "GarageType", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature")
-ok_na <- c()
-
-train$Alley[is.na(train$Alley)]
-
-
-levels(train$Alley) <- c(levels(train$Alley),"None")
-levels(train$Alley)
-train$Alley[is.na(train$Alley)] <- "None"
-head(train$Alley)
-class(train$Alley)
-
-
-# adds another factor level
-addNoneLevel <- function(x){
-    if(is.factor(x)) return(factor(x, levels=c(levels(x), "None")))
-    
-    return(x)
-}
-
-# for loop to add None factor level and assign None to NA values
-for (col in okNA) {
-    
-}
-
-for (col in train[,okNA,with=FALSE]
-
-train$Alley2 <- addNoneLevel(train$Alley)
-train$Alley2[is.na(train$Alley2)] <- "None"
 
 # impute missing values using mean/median, random forest, or mice package?
 
