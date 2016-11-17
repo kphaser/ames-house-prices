@@ -39,6 +39,11 @@ nrow(unique(train))
 nrow(train) - nrow(unique(train))
 
 anyNA(train)
+
+cat_col <- names(train)[which(sapply(train, is.factor))]
+cat_var <- c(cat_col, 'BedroomAbvGr', 'HalfBath', 'KitchenAbvGr','BsmtFullBath', 'BsmtHalfBath', 'MSSubClass')
+num_var <- names(train)[which(sapply(train, is.numeric))]
+
 colSums(sapply(train, is.na))
 colSums(sapply(train[,.SD, .SDcols = cat_var], is.na))
 
@@ -46,7 +51,6 @@ plot(train$SalePrice)
 hist(train$SalePrice)
 qqnorm(train$SalePrice)
 qqline(train$SalePrice)
-
 hist(log(train$SalePrice+1))
 
 par(mfrow=c(1,2))
@@ -59,16 +63,16 @@ hist(train$SalePrice,"month")
 hist(train$SalePrice,"year")
 
 
-cat_col <- names(train)[which(sapply(train, is.factor))]
-cat_var <- c(cat_col, 'BedroomAbvGr', 'HalfBath', 'KitchenAbvGr','BsmtFullBath', 'BsmtHalfBath', 'MSSubClass')
-num_var <- names(train)[which(sapply(train, is.numeric))]
-
 summary(train[,.SD,.SDcols = num_var])
 table(train[,.SD,.SDcols = cat_var])
 
+train[,(cat_var) := lapply(.SD, as.factor), .SDcols = cat_var]
 train_cat <- train[,.SD,.SDcols = cat_var]
 train_cont <- train[,.SD,.SDcols = num_var]
 
+sum(train[,'YearRemodAdd', with = FALSE] != train[,'YearBuilt', with = FALSE])
+
+train %>% select(YearBuilt, YearRemodAdd) %>%    mutate(Remodeled = as.integer(YearBuilt != YearRemodAdd)) %>% ggplot(aes(x= factor(x = Remodeled, labels = c( 'No','Yes')))) + geom_bar() + xlab('Remodeled') + theme_light()
 
 # plotting functions for different types of plots
 plotHist <- function(data_in, i) {
