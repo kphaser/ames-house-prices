@@ -22,9 +22,7 @@ head(test)
 
 # create a time series class of data by ordering data by date and month
 
-
-
-# combine train and test sets
+# combine train and test sets?
 
 
 
@@ -37,21 +35,28 @@ str(train)
 nrow(train)
 nrow(unique(train))
 nrow(train) - nrow(unique(train))
+# check for missing values
+colSums(sapply(train, is.na))
+# check to make sure there aren't constant features
+sapply(train,function(x) length(unique(x)))
+# check features with near zero variance
+nearZeroVar(train,saveMetrics = TRUE)
 
-anyNA(train)
-
+# separate categorical and numerical variables
 cat_col <- names(train)[which(sapply(train, is.factor))]
 cat_var <- c(cat_col, 'BedroomAbvGr', 'HalfBath', 'KitchenAbvGr','BsmtFullBath', 'BsmtHalfBath', 'MSSubClass')
 num_var <- names(train)[which(sapply(train, is.numeric))]
+train[,(cat_var) := lapply(.SD, as.factor), .SDcols = cat_var]
+train_cat <- train[,.SD,.SDcols = cat_var]
+train_cont <- train[,.SD,.SDcols = num_var]
 
-colSums(sapply(train, is.na))
-colSums(sapply(train[,.SD, .SDcols = cat_var], is.na))
 
+# plots
 plot(train$SalePrice)
 hist(train$SalePrice)
 qqnorm(train$SalePrice)
 qqline(train$SalePrice)
-hist(log(train$SalePrice+1))
+hist(log(train$SalePrice+1)) # normalize response variable
 
 par(mfrow=c(1,2))
 boxplot(train$SalePrice,col="lightblue")
@@ -63,15 +68,8 @@ hist(train$SalePrice,"month")
 hist(train$SalePrice,"year")
 
 
-summary(train[,.SD,.SDcols = num_var])
-table(train[,.SD,.SDcols = cat_var])
-
-train[,(cat_var) := lapply(.SD, as.factor), .SDcols = cat_var]
-train_cat <- train[,.SD,.SDcols = cat_var]
-train_cont <- train[,.SD,.SDcols = num_var]
-
+# remodeled homes
 sum(train[,'YearRemodAdd', with = FALSE] != train[,'YearBuilt', with = FALSE])
-
 train %>% select(YearBuilt, YearRemodAdd) %>%    mutate(Remodeled = as.integer(YearBuilt != YearRemodAdd)) %>% ggplot(aes(x= factor(x = Remodeled, labels = c( 'No','Yes')))) + geom_bar() + xlab('Remodeled') + theme_light()
 
 # plotting functions for different types of plots
@@ -104,7 +102,7 @@ train %>% select(LandSlope, Neighborhood, SalePrice) %>% filter(LandSlope == c('
 
 train %>% select(Neighborhood, SalePrice) %>% ggplot(aes(factor(Neighborhood), SalePrice)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust =1)) + xlab('Neighborhoods')
 
-cor(train_cont,na.rm=TRUE)
+cor(train_cont)
 
 
 train %>% select(OverallCond, YearBuilt) %>% ggplot(aes(factor(OverallCond),YearBuilt)) + geom_boxplot() + xlab('Overall Condition')
@@ -161,7 +159,7 @@ for (col in train[,okNA,with=FALSE]
 train$Alley2 <- addNoneLevel(train$Alley)
 train$Alley2[is.na(train$Alley2)] <- "None"
 
-# impute missing values using random forest, amelia or mice package?
+# impute missing values using mean/median, random forest, or mice package?
 
 
 
