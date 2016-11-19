@@ -10,6 +10,9 @@ library(VIM)
 library(mice)
 library(rpart)
 
+train <- read.csv("data/train.csv")
+test <- read.csv("data/test.csv")
+
 
 # csv files are in the data subdirectory of the project
 # ProjectTemplate automates the process
@@ -142,51 +145,101 @@ data_corr <- train[,highcorr, with = FALSE]
 doPlots(data_corr, fun = plotCorr, ii = 1:6)
 
 
-
+# # variable importance with boruta
+# library(boruta)
+# ID.VAR <- "Id"
+# TARGET.VAR <- "SalePrice"
+# candidate.features <- setdiff(names(train_complete),c(ID.VAR,TARGET.VAR))
+# data.type <- sapply(candidate.features,function(x){class(train_complete[[x]])})
+# table(data.type)
+# # pull out the response variable
+# response <- train_complete$SalePrice
+# # remove identifier and response variables
+# train_complete <- train_complete[candidate.features]
+# 
+# set.seed(123)
+# bor.results <- Boruta(train_complete,response,
+#                       maxRuns=101,
+#                       doTrace=0)
+# bor.results
+# plot(bor.results)
 
 ### Data Prep ###
 
 
 # impute missing values using mean/median, random forest, or mice package?
 
+md.pattern(train_num)
+aggr_plot <- aggr(train_num, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, 
+                  labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
 
-
-# trim outliers?
-
+imp.train <- mice(train, method='cart', maxit=3, seed=123)
+train_complete <- complete(imp.train)
 
 
 # split training data into training and validation set
-
-
+n <- dim(train)[1]
+set.seed(123)
+valid.sample <- sample(n,round(n/4))
+valid <- train[valid.sample,]
+train <- train[-valid.sample,]
+train_control <- trainControl(method="cv", number=5)
 
 
 ### Build Models ###
 
 # Multiple linear regression
-
-
+lmfit <- lm(SalePrice~.-Id,data=train)
+summary(lmfit)
+pred <- predict(lmfit,newdata=valid)
+rmse(log(valid$SalePrice),log(pred))
 
 # Ridge regression
-
+model <- train(SalePrice~.-Id, data=train, trControl=train_control, method="rf")
+print(model)
 
 
 # Lasso regression
 
 
 
-# Poisson regression
-
-
-
 # Random forest
+rfmod <- randomForest(SalePrice~.-Id,data=train)
+pred <- predict(rfmod,newdata=valid)
+rmse(log(valid$SalePrice),log(pred))
+
+model <- train(SalePrice~.-Id, data=train, trControl=train_control, method="rf")
+print(model)
 
 
 
-# Support vector machines
+# Support vector regression
+library(e1071)
+svmfit <- svm(PRCP~.-month,r.train)
+svmpred <- predict(svmfit,r.test)
+# perform a grid search
+tuneResult <- tune(svm, PRCP ~ .-month,  data = r.train,
+                   ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9)))
+print(tuneResult)
+# Draw the tuning graph
+plot(tuneResult)
+tunedModel <- tuneResult$best.model
+tunedSVM <- predict(tunedModel, r.test) 
+
+sqrt(mean((tunedSVM-r.test$PRCP)^2))
 
 
+# GBM/XGBoost
+fitControl <- trainControl(method = "cv", number = 5)
 
-# XGBoost
+set.seed(123)
+gbmFit1 <- train(SalePrice ~ . -Id, data = train, 
+                 method = "gbm", 
+                 trControl = fitControl,
+                 verbose = FALSE)
+gbmFit1
+pred <- predict(gbmFit1,newdata=valid)
+rmse(log(valid$SalePrice),log(pred))
 
 
 
@@ -196,13 +249,6 @@ doPlots(data_corr, fun = plotCorr, ii = 1:6)
 
 # Artificial neural network
 
-
-
-# ARIMA
-
-
-
-# ETS
 
 
 
@@ -221,6 +267,14 @@ doPlots(data_corr, fun = plotCorr, ii = 1:6)
 
 ### Submission File ###
 
+# random forest no parameter adjustments
+rfsubmit <- randomForest(SalePrice~.-Id,data=train_complete)
+pred <- predict(rfsubmit,newdata=test)
+results <- data.frame(Id=test$Id,SalePrice=pred)
+write.csv(results,'randomforest1.csv',row.names=FALSE)
 
-
-
+# gbm w/ n.trees=150,interaction.depth=3,shrinkage=0.1,n.minobsinnode=10
+gbmsubmit <- gbm(SalePrice~.-Id,data=train_complete,n.trees=150,interaction.depth=3,shrinkage=0.1,n.minobsinnode=10,verbose=FALSE)
+pred <- predict(gbmsubmit,newdata=test,n.trees=150,type="response")
+results <- data.frame(Id=test$Id,SalePrice=pred)
+write.csv(results,'gbm1.csv',row.names=FALSE)
