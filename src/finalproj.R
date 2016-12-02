@@ -7,6 +7,7 @@ library(dplyr)
 library(data.table)
 library(caret)
 library(moments)
+library(corrplot)
 library(VIM)
 library(mice)
 library(rpart)
@@ -14,6 +15,9 @@ library(rpart)
 train <- read.csv("data/train.csv",stringsAsFactors=FALSE)
 test <- read.csv("data/test.csv",stringsAsFactors=FALSE)
 
+
+train <- read.csv("data/train.csv",stringsAsFactors=TRUE)
+test <- read.csv("data/test.csv",stringsAsFactors=TRUE)
 
 # csv files are in the data subdirectory of the project
 # ProjectTemplate automates the process
@@ -85,85 +89,34 @@ qqnorm(train$SalePrice)
 qqline(train$SalePrice)
 hist(log(train$SalePrice+1)) # normalize response variable
 
-par(mfrow=c(1,2))
-boxplot(train$SalePrice,col="lightblue")
-boxplot(log(train$SalePrice+1),col="red")
-par(mfrow=c(1,1))
-
-
-# remodeled homes
-sum(train[,'YearRemodAdd', with = FALSE] != train[,'YearBuilt', with = FALSE])
-train %>% select(YearBuilt, YearRemodAdd) %>%    mutate(Remodeled = as.integer(YearBuilt != YearRemodAdd)) %>% ggplot(aes(x= factor(x = Remodeled, labels = c( 'No','Yes')))) + geom_bar() + xlab('Remodeled') + theme_light()
-
-# plotting functions for different types of plots
-plotHist <- function(data_in, i) {
-    data <- data.frame(x=data_in[[i]])
-    p <- ggplot(data=data, aes(x=factor(x))) + stat_count() + xlab(colnames(data_in)[i]) + theme_light() + 
-        theme(axis.text.x = element_text(angle = 90, hjust =1))
-    return (p)
-}
-
-doPlots <- function(data_in, fun, ii, ncol=3) {
-    pp <- list()
-    for (i in ii) {
-        p <- fun(data_in=data_in, i=i)
-        pp <- c(pp, list(p))
-    }
-    do.call("grid.arrange", c(pp, ncol=ncol))
-}
-
-
-plotDen <- function(data_in, i){
-    data <- data.frame(x=data_in[[i]], SalePrice = data_in$SalePrice)
-    p <- ggplot(data= data) + geom_line(aes(x = x), stat = 'density', size = 1,alpha = 1.0) +
-        xlab(paste0((colnames(data_in)[i]), '\n', 'Skewness: ',round(skewness(data_in[[i]], na.rm = TRUE), 2))) + theme_light() 
-    return(p)
-}
-
 
 train %>% select(LandSlope, Neighborhood, SalePrice) %>% filter(LandSlope == c('Sev', 'Mod')) %>% arrange(Neighborhood) %>% group_by(Neighborhood, LandSlope) %>% summarize(Count = n()) %>% ggplot(aes(Neighborhood, Count)) + geom_bar(aes(fill = LandSlope), position = 'dodge', stat = 'identity') + theme_light() +theme(axis.text.x = element_text(angle = 90, hjust =1))
 
+# plot of SalePrice by Neighborhood
 train %>% select(Neighborhood, SalePrice) %>% ggplot(aes(factor(Neighborhood), SalePrice)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust =1)) + xlab('Neighborhoods')
-
-cor(train_num,use="complete.obs")
-
-
+# plot of SalePrice by MSZoning
+train %>% select(MSZoning, SalePrice) %>% ggplot(aes(factor(MSZoning), SalePrice)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust =1)) + xlab('MSZoning')
+# plot of SalePrice by FullBath
+train %>% select(FullBath, SalePrice) %>% ggplot(aes(factor(FullBath), SalePrice)) + geom_boxplot() + xlab('FullBath')
+# plot of SalePrice by GarageFinish
+train %>% select(GarageFinish, SalePrice) %>% ggplot(aes(factor(GarageFinish), SalePrice)) + geom_boxplot() + xlab('GarageFinish')
+# plot of SalePrice by KitchenQual
+train %>% select(KitchenQual, SalePrice) %>% ggplot(aes(factor(KitchenQual), SalePrice)) + geom_boxplot() + xlab('KitchenQual')
+# plot of SalePrice by CentralAir
+train %>% select(CentralAir, SalePrice) %>% ggplot(aes(factor(CentralAir), SalePrice)) + geom_boxplot() + xlab('CentralAir')
+# plot of YearBuilt by OverallQual
 train %>% select(OverallCond, YearBuilt) %>% ggplot(aes(factor(OverallCond),YearBuilt)) + geom_boxplot() + xlab('Overall Condition')
 
-# plot correlation function
-plotCorr <- function(data_in, i){
-    data <- data.frame(x = data_in[[i]], SalePrice = data_in$SalePrice)
-    p <- ggplot(data, aes(x = x, y = SalePrice)) + geom_point(shape = 1, na.rm = TRUE) + geom_smooth(method = lm ) + xlab(paste0(colnames(data_in)[i], '\n', 'R-Squared: ', round(cor(data_in[[i]], data$SalePrice, use = 'complete.obs'), 2))) + theme_light()
-    return(suppressWarnings(p))
-}
-
-# selects variables with high correlation
-highcorr <- c(names(correlations[,'SalePrice'])[which(correlations[,'SalePrice'] > 0.5)], names(correlations[,'SalePrice'])[which(correlations[,'SalePrice'] < -0.2)])
-# subset train of variables with high correlation
-data_corr <- train[,highcorr, with = FALSE]
-
-# plot high correlation variables with sale price
-doPlots(data_corr, fun = plotCorr, ii = 1:6)
 
 
-# # variable importance with boruta
-# library(boruta)
-# ID.VAR <- "Id"
-# TARGET.VAR <- "SalePrice"
-# candidate.features <- setdiff(names(train_complete),c(ID.VAR,TARGET.VAR))
-# data.type <- sapply(candidate.features,function(x){class(train_complete[[x]])})
-# table(data.type)
-# # pull out the response variable
-# response <- train_complete$SalePrice
-# # remove identifier and response variables
-# train_complete <- train_complete[candidate.features]
-# 
-# set.seed(123)
-# bor.results <- Boruta(train_complete,response,
-#                       maxRuns=101,
-#                       doTrace=0)
-# bor.results
-# plot(bor.results)
+# plot correlations
+numericdf <- total[,numeric_vars]
+ames_cor <- cor(numericdf)
+col <- colorRampPalette(c("#BB4444","#EE9988","#FFFFFF","#77AADD","#4477AA"))
+corrplot(ames_cor,method="shade",shade.col=NA,tl.col="black",tl.srt=45,col=col(200),addCoef.col="black",addcolorlabel="no",order="AOE")
+
+
+
 
 ### Data Prep ###
 

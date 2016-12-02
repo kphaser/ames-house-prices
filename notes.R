@@ -22,8 +22,11 @@
 # trim outliers
 
 # Variables to fix/examine/remove
-# Street, Alley, Utilities, LotConfig, Condition2, RoofMatl, ExterCond, BsmtFinSF2, Heating, LowQualFinSF, BsmtHalfBath, EnclosedPorch, X3SsnPorch,
-# PoolArea, PoolQC, MiscFeature, MiscVal, MoSold, YrSold, SaleType
+# Street x, Alley y, Utilities x, LotConfig y, Condition2 x, RoofMatl x, ExterCond y, BsmtFinSF2 x, Heating x, LowQualFinSF x, BsmtHalfBath y, 
+# EnclosedPorch x, X3SsnPorch x, PoolArea x, PoolQC y, MiscFeature x, MiscVal x, MoSold, YrSold, SaleType y
+
+# Zero variance but not removed?
+# LandContour, LandSlope, BsmtCond, BsmtFinType2, KitchenAbvGr, Functional, GarageQual, GarageCond, ScreenPorch,
 
 # New variables?
 # New home, AccStreet, SaleCondNorm, Tsldx, Fenc, Basement, RemodAge, Fireplace, Garage, GarageAge, HouseAge

@@ -1,9 +1,23 @@
 # Setup environment to maximize parellel computing
+rm(list=ls())
 memory.size(max=T)
 library(doParallel)
 library(foreach)
 c1=makeCluster(2)
 registerDoParallel(c1)
+
+# Load the libraries
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(caret)
+library(moments)
+library(corrplot)
+library(VIM)
+
+# load in data with stringsAsFactors=FALSE for one-hot encoding
+train <- read.csv("data/train.csv",stringsAsFactors=FALSE)
+test <- read.csv("data/test.csv",stringsAsFactors=FALSE)
 
 
 # Save copy of train data for initial EDA
@@ -13,33 +27,27 @@ train_eda <- train
 total <- rbind(dplyr::select(train,MSSubClass:SaleCondition),
                dplyr::select(test,MSSubClass:SaleCondition))
 
-# remove near zero variance features
-removeVar <- c("Street","Alley","LandContour","Utilities","LandSlope","Condition2","RoofMatl","BsmtCond","BsmtFinType2","BsmtFinSF2",
-               "Heating","LowQualFinSF","KitchenAbvGr","Functional","OpenPorchSF","EnclosedPorch","X3SsnPorch","ScreenPorch","PoolArea","PoolQC",
-               "MiscFeature","MiscVal")
-total <- total[,!(names(total) %in% removeVar)]
 
 
 # log transformation of SalePrice
 train$SalePrice <- log(train$SalePrice+1)
 
-# create new features
-total$YearMo <- as.numeric(total$YrSold)*12+as.numeric(total$MoSold)
 
-# get numeric variables and transform those with high skewness using log
+
+
+# Remove near zero variance features or constant features
+removeVar <- c("Street","Alley","Utilities","LotConfig","Condition2","RoofMatl","ExterCond","BsmtFinSF2","Heating","LowQualFinSF",
+               "BsmtHalfBath","EnclosedPorch","X3SsnPorch","PoolQC","MiscFeature","MiscVal","MoSold","SaleType")
+total <- total[,!(names(total) %in% removeVar)]
+
+
+# get numeric variables and determine the variables that have high skew 
 feature_classes <- sapply(names(total),function(x){class(total[[x]])})
 numeric_vars <- names(feature_classes[feature_classes!="character"])
 skewed_vars <- sapply(numeric_vars,function(x){skewness(total[[x]],na.rm=TRUE)})
 skewed_vars <- skewed_vars[skewed_vars>0.75]
-for(x in names(skewed_vars)) {
-    total[[x]] <- log(total[[x]]+1)
-}
 
-# get categorical variables and create dummy variables
-cat_vars <- names(feature_classes[feature_classes=="character"])
-dummies <- dummyVars(~.,total[cat_vars])
-cat_encode <- predict(dummies,total[cat_vars])
-cat_encode[is.na(cat_encode)] <- 0
+
 
 # impute missing values in numeric variables with mean
 numeric_df <- total[numeric_vars]
@@ -48,20 +56,58 @@ for(x in numeric_vars){
     total[[x]][is.na(total[[x]])] <- mean_value
 }
 
-# impute missing values in numeric variables with median
-numeric_df <- total[numeric_vars]
-for(x in numeric_vars){
-    median_value <- median(train[[x]],na.rm=TRUE)
-    total[[x]][is.na(total[[x]])] <- median_value
+
+# Create new features
+total$NewHome <- ifelse(total$YearBuilt>=2000,1,0)
+total$Basement <- ifelse(total$TotalBsmtSF>0,1,0)
+total$RemodelAge <- total$YrSold-total$YearRemodAdd
+total$Fireplace <- ifelse(total$Fireplaces>0,1,0)
+total$Garage <- ifelse(total$GarageCars>0,1,0)
+total$GarageAge <- total$YrSold-total$GarageYrBlt
+total$HouseAge <- total$YrSold-total$YearBuilt
+total$Pool <- ifelse(total$PoolArea>0,1,0)
+total$Fencing <- ifelse(!is.na(total$Fence),1,0)
+
+# check summary the data
+summary(total)
+
+# there are negative values that don't make sense which need investigating
+total[which(total$RemodelAge<0),] <- 0
+total[which(total$HouseAge<0),] <- 0
+# one of the homes have a garage built in 2207. This doesn't seem right so we'll fix it 2007.
+total$GarageYrBlt[2593] <- 2007
+total[which(total$GarageAge<0),] <- 0
+# check to make sure there are no more negative values
+summary(total)
+
+
+
+# get categorical variables and create dummy variables
+cat_vars <- names(feature_classes[feature_classes=="character"])
+dummies <- dummyVars(~.,total[cat_vars])
+cat_encode <- predict(dummies,total[cat_vars])
+cat_encode[is.na(cat_encode)] <- 0
+
+
+
+
+
+
+# transform those with high skewness using log
+for(x in names(skewed_vars)) {
+    total[[x]] <- log(total[[x]]+1)
 }
 
+
+
+# create vector of numeric variables to include the new created features
+feature_classes <- sapply(names(total),function(x){class(total[[x]])})
+numeric_vars <- names(feature_classes[feature_classes!="character"])
+numeric_vars <- numeric_vars[-c(28,29)]
 
 # combine processed data together
 total <- cbind(total[numeric_vars],cat_encode)
 
-# impute using mice
-imp <- mice(total, m=1, method='cart', seed=123, maxit=1)
-total <- complete(imp)
 
 
 # split into training and test
@@ -69,12 +115,19 @@ x_train <- total[1:nrow(train),]
 x_test <- total[(nrow(train)+1):nrow(total),]
 y <- train$SalePrice
 
-# create data frame for correlated variables for later
-# corr_df <- data.frame(total$X1stFlrSF,total$X2ndFlrSF,total$LowQualFinSF,total$GrLivArea,total$TotFlrSF,total$AllLivArea)
 
-# drop highly correlated variables
-# dropvars <- c("X1stFlrSF","X2ndFlrSF","GrLivArea")
-# total <- total[,!(names(total)%in%dropvars)]
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
